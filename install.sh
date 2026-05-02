@@ -18,6 +18,7 @@ umask 027
 # /usr/local/bin, /etc/cron.d, and /etc/logrotate.d.
 # ==================================================
 
+DEFAULT_SOURCE_DIR="/root/.openclaw"
 DEFAULT_SCRIPT_DIR="/usr/local/bin"
 DEFAULT_BACKUP_DIR="/var/backups/openclaw"
 LOG_DIR="/var/log/openclaw-backups"
@@ -55,10 +56,17 @@ prompt_with_default() {
 echo "OpenClaw Backup System Installer"
 echo "---------------------------------"
 
+source_dir="$(prompt_with_default "Which directory should be backed up?" "$DEFAULT_SOURCE_DIR")"
 script_dir="$(prompt_with_default "Install the backup script into which directory?" "$DEFAULT_SCRIPT_DIR")"
 backup_dir="$(prompt_with_default "Where should backups be stored?" "$DEFAULT_BACKUP_DIR")"
 
+if [[ ! -d "$source_dir" ]]; then
+  echo "WARNING: Source directory does not exist yet: $source_dir"
+  echo "The installer will continue, but backups will fail until this directory exists."
+fi
+
 printf "\nSummary of installation settings:\n"
+echo "  Source directory:              $source_dir"
 echo "  Script installation directory: $script_dir"
 echo "  Backup directory:             $backup_dir"
 echo "  Log directory:                $LOG_DIR"
@@ -94,8 +102,8 @@ umask 027
 # configured maximum, the oldest backups are removed.
 # ==================================================
 
-# Directory to back up. Adjust this if your
-# .openclaw folder lives under a different user.
+# Directory to back up. The installer replaces this
+# value during installation.
 SOURCE_DIR="/root/.openclaw"
 
 # Base directory where backups are stored. The
@@ -265,6 +273,7 @@ log "OpenClaw Backup Script finished"
 BACKUP_SCRIPT
 
 # Replace installer-selected values inside the installed script.
+sed -i "s|^SOURCE_DIR=.*|SOURCE_DIR=\"$source_dir\"|" "$install_script_path"
 sed -i "s|^BACKUP_BASE_DIR=.*|BACKUP_BASE_DIR=\"$backup_dir\"|" "$install_script_path"
 sed -i "s|^ADMIN_GROUP=.*|ADMIN_GROUP=\"$ADMIN_GROUP\"|" "$install_script_path"
 
@@ -313,6 +322,8 @@ printf "\nInstallation complete.\n"
 echo "--------------------------------------------------"
 echo "The backup script has been installed at:"
 echo "  $install_script_path"
+echo "Source directory to back up:"
+echo "  $source_dir"
 echo "Backups will be written to:"
 echo "  $backup_dir"
 echo "Logs will be written to:"
