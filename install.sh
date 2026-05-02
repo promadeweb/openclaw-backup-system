@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 027
 
 # ==================================================
 # OpenClaw Backup System Installer
@@ -29,39 +30,59 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
+if getent group sudo >/dev/null 2>&1; then
+  ADMIN_GROUP="sudo"
+elif getent group wheel >/dev/null 2>&1; then
+  ADMIN_GROUP="wheel"
+else
+  ADMIN_GROUP="root"
+fi
+
+prompt_with_default() {
+  local prompt="$1"
+  local default_value="$2"
+  local answer=""
+
+  if [[ -r /dev/tty ]]; then
+    read -r -p "$prompt [$default_value]: " answer < /dev/tty
+  elif [[ -t 0 ]]; then
+    read -r -p "$prompt [$default_value]: " answer
+  fi
+
+  echo "${answer:-$default_value}"
+}
+
 echo "OpenClaw Backup System Installer"
 echo "---------------------------------"
 
-read -r -p "Install the backup script into which directory? [${DEFAULT_SCRIPT_DIR}]: " script_dir
-script_dir="${script_dir:-$DEFAULT_SCRIPT_DIR}"
-
-read -r -p "Where should backups be stored? [${DEFAULT_BACKUP_DIR}]: " backup_dir
-backup_dir="${backup_dir:-$DEFAULT_BACKUP_DIR}"
+script_dir="$(prompt_with_default "Install the backup script into which directory?" "$DEFAULT_SCRIPT_DIR")"
+backup_dir="$(prompt_with_default "Where should backups be stored?" "$DEFAULT_BACKUP_DIR")"
 
 printf "\nSummary of installation settings:\n"
 echo "  Script installation directory: $script_dir"
 echo "  Backup directory:             $backup_dir"
 echo "  Log directory:                $LOG_DIR"
+echo "  Admin group read/list access: $ADMIN_GROUP"
 
 # Create directories
 mkdir -p "$script_dir"
 mkdir -p "$backup_dir"
 mkdir -p "$LOG_DIR"
 
-# Set ownership and permissions. These ensure only
-# root can modify the backup script and backups.
-chown root:root "$script_dir" "$backup_dir" "$LOG_DIR"
-chmod 700 "$script_dir"
-chmod 700 "$backup_dir"
+# Root owns the installed files. The admin group can list
+# directories and read files/logs, but cannot modify them.
+chown root:"$ADMIN_GROUP" "$script_dir" "$backup_dir" "$LOG_DIR"
+chmod 750 "$script_dir"
+chmod 750 "$backup_dir"
 chmod 750 "$LOG_DIR"
 
-# Write the backup script directly from this
-# installer, so the repository does not need to be
-# present on the target machine.
+# Write the backup script directly from this installer, so the
+# repository does not need to be present on the target machine.
 install_script_path="$script_dir/$SCRIPT_NAME"
 cat > "$install_script_path" <<'BACKUP_SCRIPT'
 #!/usr/bin/env bash
 set -euo pipefail
+umask 027
 
 # ==================================================
 # OpenClaw Backup Script
@@ -81,6 +102,12 @@ SOURCE_DIR="/root/.openclaw"
 # installer replaces this value during installation.
 BACKUP_BASE_DIR="/var/backups/openclaw"
 
+# System group allowed to list backup folders and
+# read backup files/logs. The installer sets this to
+# sudo on Debian/Ubuntu, wheel on RHEL/Fedora, or
+# root if no admin group is found.
+ADMIN_GROUP="sudo"
+
 # Directory where logs are written.
 LOG_DIR="/var/log/openclaw-backups"
 LOG_FILE="${LOG_DIR}/openclaw-backup.log"
@@ -97,12 +124,29 @@ BACKUP_SUFFIX="OpenClaw"
 CURRENT_BACKUP_NAME="${DATE_STR}-${BACKUP_SUFFIX}"
 CURRENT_BACKUP_DIR="${BACKUP_BASE_DIR}/${CURRENT_BACKUP_NAME}"
 
+set_admin_group_permissions() {
+  local path="$1"
+
+  if getent group "$ADMIN_GROUP" >/dev/null 2>&1; then
+    chgrp -R "$ADMIN_GROUP" "$path"
+    chmod -R u+rwX,g+rX,o-rwx "$path"
+  else
+    chmod -R u+rwX,o-rwx "$path"
+  fi
+}
+
 # ===== Prepare directories =====
 mkdir -p "$BACKUP_BASE_DIR"
 mkdir -p "$LOG_DIR"
+set_admin_group_permissions "$BACKUP_BASE_DIR"
+set_admin_group_permissions "$LOG_DIR"
 
-# Ensure the log file exists with reasonable permissions.
+# Ensure the log file exists with permissions that
+# allow root to write and the admin group to read.
 touch "$LOG_FILE"
+if getent group "$ADMIN_GROUP" >/dev/null 2>&1; then
+  chgrp "$ADMIN_GROUP" "$LOG_FILE"
+fi
 chmod 640 "$LOG_FILE"
 
 # ===== Logging =====
@@ -114,6 +158,7 @@ log() {
 
 log "=============================================="
 log "OpenClaw Backup Script started"
+log "Admin group with read/list access: $ADMIN_GROUP"
 
 # ===== Lock to prevent overlapping runs =====
 exec 9>"$LOCK_FILE"
@@ -147,6 +192,7 @@ fi
 mkdir -p "$CURRENT_BACKUP_DIR"
 log "Copying source directory..."
 cp -a "$SOURCE_DIR" "$CURRENT_BACKUP_DIR/"
+set_admin_group_permissions "$CURRENT_BACKUP_DIR"
 
 # ===== Compress old backups =====
 cd "$BACKUP_BASE_DIR"
@@ -166,6 +212,10 @@ for name in "${BACKUP_NAMES[@]}"; do
     log "Compressing: $name -> ${name}.zip"
     rm -f "${name}.zip"
     zip -rq "${name}.zip" "$name"
+    if getent group "$ADMIN_GROUP" >/dev/null 2>&1; then
+      chgrp "$ADMIN_GROUP" "${name}.zip"
+    fi
+    chmod 640 "${name}.zip"
     rm -rf "$name"
   fi
 done
@@ -177,6 +227,18 @@ mapfile -t BACKUP_NAMES < <(
     | sed 's/\.zip$//' \
     | sort -u
 )
+
+# Ensure existing backup files/directories remain visible to the admin group.
+for name in "${BACKUP_NAMES[@]}"; do
+  if [[ -d "$name" ]]; then
+    set_admin_group_permissions "$name"
+  elif [[ -f "${name}.zip" ]]; then
+    if getent group "$ADMIN_GROUP" >/dev/null 2>&1; then
+      chgrp "$ADMIN_GROUP" "${name}.zip"
+    fi
+    chmod 640 "${name}.zip"
+  fi
+done
 
 # ===== Rotate backups =====
 TOTAL="${#BACKUP_NAMES[@]}"
@@ -195,20 +257,23 @@ else
   log "Backup rotation not needed."
 fi
 
+set_admin_group_permissions "$BACKUP_BASE_DIR"
+set_admin_group_permissions "$LOG_DIR"
+
 log "Backup completed successfully: $CURRENT_BACKUP_DIR"
 log "OpenClaw Backup Script finished"
 BACKUP_SCRIPT
 
-# Replace the BACKUP_BASE_DIR definition inside the installed script
-# with the backup directory selected by the user.
+# Replace installer-selected values inside the installed script.
 sed -i "s|^BACKUP_BASE_DIR=.*|BACKUP_BASE_DIR=\"$backup_dir\"|" "$install_script_path"
+sed -i "s|^ADMIN_GROUP=.*|ADMIN_GROUP=\"$ADMIN_GROUP\"|" "$install_script_path"
 
-chown root:root "$install_script_path"
-chmod 700 "$install_script_path"
+chown root:"$ADMIN_GROUP" "$install_script_path"
+chmod 750 "$install_script_path"
 
 # Ensure the log file exists and set appropriate permissions.
 touch "$LOG_DIR/openclaw-backup.log"
-chown root:root "$LOG_DIR/openclaw-backup.log"
+chown root:"$ADMIN_GROUP" "$LOG_DIR/openclaw-backup.log"
 chmod 640 "$LOG_DIR/openclaw-backup.log"
 
 # Install the logrotate configuration.
@@ -220,7 +285,7 @@ $LOG_DIR/openclaw-backup.log {
     delaycompress
     missingok
     notifempty
-    create 0640 root root
+    create 0640 root $ADMIN_GROUP
 }
 EOF
 chown root:root "$LOGROTATE_CONF"
@@ -252,5 +317,7 @@ echo "Backups will be written to:"
 echo "  $backup_dir"
 echo "Logs will be written to:"
 echo "  $LOG_DIR/openclaw-backup.log"
+echo "Admin group with read/list access:"
+echo "  $ADMIN_GROUP"
 echo "A cron job has been created in $CRON_FILE to run the backup"
 echo "daily at 05:30. You can adjust the schedule by editing that file."
