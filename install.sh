@@ -196,10 +196,12 @@ if [[ -f "${CURRENT_BACKUP_DIR}.zip" ]]; then
   rm -f "${CURRENT_BACKUP_DIR}.zip"
 fi
 
-# Create today's backup directory and copy data.
+# Create today's backup directory and copy the contents of SOURCE_DIR.
+# Using SOURCE_DIR/. copies hidden files too, but does not create an
+# extra .openclaw directory inside the dated backup folder.
 mkdir -p "$CURRENT_BACKUP_DIR"
-log "Copying source directory..."
-cp -a "$SOURCE_DIR" "$CURRENT_BACKUP_DIR/"
+log "Copying source directory contents..."
+cp -a "$SOURCE_DIR"/. "$CURRENT_BACKUP_DIR/"
 set_admin_group_permissions "$CURRENT_BACKUP_DIR"
 
 # ===== Compress old backups =====
