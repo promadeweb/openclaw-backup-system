@@ -2,12 +2,14 @@
 
 Sistema de respaldo diario para la carpeta de datos de OpenClaw.
 
-Este repositorio incluye un instalador autocontenido para dejar configurado un backup diario en un servidor Linux con cron y logrotate. No necesitas clonar el repositorio en la máquina destino.
+Este repositorio deja configurado un backup diario en un servidor Linux con cron y logrotate. No necesitas clonar el repositorio en la máquina destino.
 
 ## Archivos incluidos
 
-- `install.sh`: instalador autocontenido. Crea e instala el script de backup en el servidor.
-- `backup-openclaw.sh`: versión fuente del script de backup. El instalador también incluye este contenido internamente.
+- `install.sh`: instalador. Descarga o copia `backup-openclaw.sh`, aplica la configuración elegida y deja cron/logrotate funcionando.
+- `backup-openclaw.sh`: única fuente de verdad de la lógica de backup.
+
+El instalador no duplica la lógica del backup. Si se ejecuta desde un checkout local y encuentra `backup-openclaw.sh` al lado, usa ese archivo. Si se ejecuta desde URL o como archivo suelto, descarga `backup-openclaw.sh` desde GitHub.
 
 ## Qué hace el backup
 
@@ -57,6 +59,8 @@ La instalación debe ejecutarse con `sudo`, porque el instalador escribe en ruta
 curl -fsSL https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh | sudo bash
 ```
 
+Este comando ejecuta el instalador. Durante la instalación, `install.sh` descarga `backup-openclaw.sh` desde GitHub y lo instala como `/usr/local/bin/backup-openclaw.sh`.
+
 ### Opción alternativa: descargar en `/tmp` y ejecutar con sudo
 
 ```bash
@@ -74,7 +78,16 @@ sudo /usr/local/sbin/install-openclaw-backup.sh
 
 > No descargues el instalador con `curl -o install-openclaw-backup.sh` desde una carpeta donde tu usuario normal no tenga permisos de escritura. En ese caso `curl` fallará antes de que `sudo` pueda ejecutar el instalador.
 
-> Nota: si el repositorio es privado, la URL raw pública no funcionará sin autenticación. En ese caso descarga `install.sh` desde GitHub o copia el archivo manualmente al servidor y ejecútalo con `sudo bash install.sh`.
+> Nota: si el repositorio es privado, la URL raw pública no funcionará sin autenticación. En ese caso descarga el repo o copia ambos archivos, `install.sh` y `backup-openclaw.sh`, al servidor y ejecuta `sudo bash install.sh` desde esa carpeta.
+
+### Usar otra URL para el script de backup
+
+Si necesitas apuntar el instalador a otra rama, fork o URL autenticada, puedes definir `BACKUP_SCRIPT_URL`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh \
+  | sudo BACKUP_SCRIPT_URL="https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/backup-openclaw.sh" bash
+```
 
 El instalador preguntará:
 
@@ -96,7 +109,7 @@ También puedes instalar desde una copia local del repositorio:
 sudo bash install.sh
 ```
 
-Ya no es necesario que `backup-openclaw.sh` esté presente junto al instalador, porque `install.sh` es autocontenido.
+En este caso, el instalador usa el `backup-openclaw.sh` local que está en la misma carpeta.
 
 ## Valores por defecto
 
@@ -112,6 +125,7 @@ Ya no es necesario que `backup-openclaw.sh` esté presente junto al instalador, 
 | Hora de ejecución | Todos los días a las `05:30` |
 | Backups retenidos | `10` |
 | Grupo administrador | `sudo`, `wheel` o `root` como fallback |
+| Script fuente | `backup-openclaw.sh` |
 
 ## Ejecución manual
 
@@ -267,6 +281,20 @@ O descarga en `/tmp`:
 ```bash
 curl -fsSL -o /tmp/install-openclaw-backup.sh https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh
 sudo bash /tmp/install-openclaw-backup.sh
+```
+
+### El instalador no puede descargar `backup-openclaw.sh`
+
+Si el repo es privado o la URL raw no es accesible, instala desde un checkout local que contenga ambos archivos:
+
+```bash
+sudo bash install.sh
+```
+
+O ejecuta el instalador con una URL alternativa:
+
+```bash
+sudo BACKUP_SCRIPT_URL="https://example.com/backup-openclaw.sh" bash install.sh
 ```
 
 ### El backup falla porque no existe la fuente
