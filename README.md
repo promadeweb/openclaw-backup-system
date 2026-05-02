@@ -2,16 +2,16 @@
 
 Sistema de respaldo diario para la carpeta de datos de OpenClaw.
 
-Este repositorio incluye un script de backup y un instalador para dejarlo configurado en un servidor Linux con cron y logrotate.
+Este repositorio incluye un instalador autocontenido para dejar configurado un backup diario en un servidor Linux con cron y logrotate. No necesitas clonar el repositorio en la máquina destino.
 
 ## Archivos incluidos
 
-- `backup-openclaw.sh`: crea backups diarios de `/root/.openclaw`.
-- `install.sh`: instala el script, crea directorios, configura permisos, cron y logrotate.
+- `install.sh`: instalador autocontenido. Crea e instala el script de backup en el servidor.
+- `backup-openclaw.sh`: versión fuente del script de backup. El instalador también incluye este contenido internamente.
 
 ## Qué hace el backup
 
-El script `backup-openclaw.sh` realiza las siguientes tareas:
+El script instalado `backup-openclaw.sh` realiza las siguientes tareas:
 
 1. Valida que exista el directorio fuente `/root/.openclaw`.
 2. Crea un backup del día con el formato:
@@ -44,14 +44,25 @@ El script `backup-openclaw.sh` realiza las siguientes tareas:
   /root/.openclaw
   ```
 
-## Instalación
+## Instalación sin clonar el repo
 
-Desde la raíz del repositorio:
+Puedes descargar y ejecutar solo `install.sh`.
+
+### Opción 1: descargar el instalador y ejecutarlo
 
 ```bash
-chmod +x install.sh backup-openclaw.sh
-sudo ./install.sh
+curl -fsSL -o install-openclaw-backup.sh https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh
+chmod +x install-openclaw-backup.sh
+sudo ./install-openclaw-backup.sh
 ```
+
+### Opción 2: ejecutarlo directamente desde la URL
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh | sudo bash
+```
+
+> Nota: si el repositorio es privado, la URL raw pública no funcionará sin autenticación. En ese caso descarga `install.sh` desde GitHub o copia el archivo manualmente al servidor y ejecútalo con `sudo bash install.sh`.
 
 El instalador preguntará:
 
@@ -61,6 +72,17 @@ Where should backups be stored? [/var/backups/openclaw]:
 ```
 
 Puedes presionar ENTER para usar los valores por defecto.
+
+## Instalación desde el repo clonado
+
+También puedes instalar desde una copia local del repositorio:
+
+```bash
+chmod +x install.sh
+sudo ./install.sh
+```
+
+Ya no es necesario que `backup-openclaw.sh` esté presente junto al instalador, porque `install.sh` es autocontenido.
 
 ## Valores por defecto
 
@@ -111,12 +133,12 @@ El backup del día queda como carpeta normal. Los backups anteriores se comprime
 La forma recomendada es volver a ejecutar el instalador:
 
 ```bash
-sudo ./install.sh
+sudo ./install-openclaw-backup.sh
 ```
 
 Cuando pregunte por el destino de backups, indica la nueva ruta.
 
-El instalador modifica únicamente la copia instalada del script. El archivo `backup-openclaw.sh` del repositorio conserva sus valores por defecto.
+El instalador modifica la copia instalada del script y deja configurado cron con esa ruta.
 
 ## Cambiar la carpeta fuente
 
@@ -186,7 +208,7 @@ Los archivos quedan propiedad de `root:root`.
 El instalador es idempotente. Puedes ejecutarlo varias veces:
 
 ```bash
-sudo ./install.sh
+sudo ./install-openclaw-backup.sh
 ```
 
 Al reinstalar, se sobrescriben:
