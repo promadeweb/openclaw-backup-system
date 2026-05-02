@@ -31,6 +31,7 @@ El script instalado `backup-openclaw.sh` realiza las siguientes tareas:
    ```
 
 8. Usa un lock en `/tmp/openclaw-backup.lock` para evitar ejecuciones simultáneas.
+9. Permite que el grupo administrador del sistema pueda listar carpetas y leer archivos/logs.
 
 ## Requisitos
 
@@ -71,7 +72,7 @@ Install the backup script into which directory? [/usr/local/bin]:
 Where should backups be stored? [/var/backups/openclaw]:
 ```
 
-Puedes presionar ENTER para usar los valores por defecto.
+Puedes presionar ENTER para usar los valores por defecto. Si lo ejecutas en un entorno no interactivo, el instalador usará automáticamente los valores por defecto.
 
 ## Instalación desde el repo clonado
 
@@ -96,6 +97,7 @@ Ya no es necesario que `backup-openclaw.sh` esté presente junto al instalador, 
 | Logrotate | `/etc/logrotate.d/openclaw-backup` |
 | Hora de ejecución | Todos los días a las `05:30` |
 | Backups retenidos | `10` |
+| Grupo administrador | `sudo`, `wheel` o `root` como fallback |
 
 ## Ejecución manual
 
@@ -108,6 +110,14 @@ sudo /usr/local/bin/backup-openclaw.sh
 Si elegiste otro directorio de instalación, usa la ruta correspondiente.
 
 ## Ver logs
+
+Los usuarios del grupo administrador pueden leer el log directamente:
+
+```bash
+tail -f /var/log/openclaw-backups/openclaw-backup.log
+```
+
+También puedes verlo con sudo:
 
 ```bash
 sudo tail -f /var/log/openclaw-backups/openclaw-backup.log
@@ -127,6 +137,28 @@ Ejemplo:
 ```
 
 El backup del día queda como carpeta normal. Los backups anteriores se comprimen automáticamente.
+
+## Permisos
+
+El instalador detecta el grupo administrador disponible en este orden:
+
+1. `sudo`
+2. `wheel`
+3. `root` como fallback
+
+Los directorios principales quedan con propietario `root:<grupo-admin>` y permisos `750`, para que root pueda escribir y el grupo administrador pueda entrar/listar:
+
+```text
+/usr/local/bin
+/var/backups/openclaw
+/var/log/openclaw-backups
+```
+
+El script instalado queda como `root:<grupo-admin>` con permisos `750`.
+
+Los logs y archivos `.zip` quedan como `root:<grupo-admin>` con permisos `640`, para que root pueda escribir y el grupo administrador pueda leer.
+
+Los directorios de backups quedan sin permisos para otros usuarios y con lectura/listado para el grupo administrador.
 
 ## Cambiar la carpeta de backup
 
@@ -184,24 +216,11 @@ El instalador crea esta configuración en `/etc/logrotate.d/openclaw-backup`:
     delaycompress
     missingok
     notifempty
-    create 0640 root root
+    create 0640 root <grupo-admin>
 }
 ```
 
-Esto rota los logs diariamente y conserva 14 rotaciones comprimidas.
-
-## Seguridad y permisos
-
-El instalador aplica permisos restrictivos:
-
-- Directorio del script: `700`.
-- Directorio de backups: `700`.
-- Directorio de logs: `750`.
-- Script instalado: `700`.
-- Log: `640`.
-- Cron y logrotate: `644`.
-
-Los archivos quedan propiedad de `root:root`.
+Esto rota los logs diariamente, conserva 14 rotaciones comprimidas y mantiene los logs legibles por el grupo administrador.
 
 ## Reinstalación
 
@@ -238,6 +257,23 @@ sudo cat /etc/cron.d/openclaw-backup
 ```
 
 Luego revisa logs del sistema cron según tu distribución.
+
+### No puedo ver los backups como usuario sudoer
+
+Verifica tu grupo:
+
+```bash
+groups
+```
+
+Luego revisa permisos:
+
+```bash
+ls -ld /var/backups/openclaw /var/log/openclaw-backups
+ls -la /var/backups/openclaw
+```
+
+Si el grupo fue actualizado recientemente, cierra sesión y vuelve a entrar para que el sistema refresque tu membresía de grupos.
 
 ### No se comprimen backups antiguos
 
