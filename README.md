@@ -20,18 +20,19 @@ El script instalado `backup-openclaw.sh` realiza las siguientes tareas:
    YYYY.MM.DD-OpenClaw
    ```
 
-3. Mantiene el backup más reciente sin comprimir.
-4. Comprime backups anteriores como `.zip`.
-5. Mantiene como máximo 10 backups.
-6. Elimina los backups más antiguos cuando se supera ese límite.
-7. Escribe logs en:
+3. Copia el contenido del directorio fuente directamente dentro del backup diario.
+4. Mantiene el backup más reciente sin comprimir.
+5. Comprime backups anteriores como `.zip`.
+6. Mantiene como máximo 10 backups.
+7. Elimina los backups más antiguos cuando se supera ese límite.
+8. Escribe logs en:
 
    ```text
    /var/log/openclaw-backups/openclaw-backup.log
    ```
 
-8. Usa un lock en `/tmp/openclaw-backup.lock` para evitar ejecuciones simultáneas.
-9. Permite que el grupo administrador del sistema pueda listar carpetas y leer archivos/logs.
+9. Usa un lock en `/tmp/openclaw-backup.lock` para evitar ejecuciones simultáneas.
+10. Permite que el grupo administrador del sistema pueda listar carpetas y leer archivos/logs.
 
 ## Requisitos
 
@@ -138,7 +139,7 @@ sudo tail -f /var/log/openclaw-backups/openclaw-backup.log
 
 ## Estructura esperada de backups
 
-Ejemplo:
+Si la carpeta fuente es `/root/.openclaw` y contiene `openclaw.json`, el backup queda así:
 
 ```text
 /var/backups/openclaw/
@@ -146,10 +147,12 @@ Ejemplo:
 ├── 2026.04.24-OpenClaw.zip
 ├── 2026.04.25-OpenClaw.zip
 └── 2026.04.26-OpenClaw/
-    └── .openclaw/
+    └── openclaw.json
 ```
 
 El backup del día queda como carpeta normal. Los backups anteriores se comprimen automáticamente.
+
+> El script copia el contenido de la carpeta fuente, no la carpeta fuente como subdirectorio. Es decir, no crea `YYYY.MM.DD-OpenClaw/.openclaw/openclaw.json`; crea `YYYY.MM.DD-OpenClaw/openclaw.json`.
 
 ## Permisos
 
@@ -281,6 +284,16 @@ sudo ls -la /root/.openclaw
 ```
 
 Si OpenClaw usa otra ubicación, vuelve a ejecutar el instalador o actualiza `SOURCE_DIR` en el script instalado.
+
+### El backup crea `.openclaw` dentro del backup diario
+
+Actualiza el instalador y reinstala:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh | sudo bash
+```
+
+La versión actual copia `SOURCE_DIR/.` dentro del backup diario, por lo que el contenido queda en la raíz del backup.
 
 ### No se crean backups automáticamente
 
