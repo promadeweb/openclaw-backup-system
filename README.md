@@ -13,7 +13,7 @@ Este repositorio incluye un instalador autocontenido para dejar configurado un b
 
 El script instalado `backup-openclaw.sh` realiza las siguientes tareas:
 
-1. Valida que exista el directorio fuente `/root/.openclaw`.
+1. Valida que exista el directorio fuente configurado durante la instalación.
 2. Crea un backup del día con el formato:
 
    ```text
@@ -40,7 +40,7 @@ El script instalado `backup-openclaw.sh` realiza las siguientes tareas:
 - Permisos de root para instalar.
 - `curl` si vas a instalar desde URL.
 - `zip` instalado. El instalador intenta instalarlo automáticamente si el sistema usa `apt-get`.
-- La carpeta fuente debe existir:
+- La carpeta fuente debe existir antes de ejecutar el backup. El valor por defecto es:
 
   ```text
   /root/.openclaw
@@ -78,11 +78,14 @@ sudo /usr/local/sbin/install-openclaw-backup.sh
 El instalador preguntará:
 
 ```text
+Which directory should be backed up? [/root/.openclaw]:
 Install the backup script into which directory? [/usr/local/bin]:
 Where should backups be stored? [/var/backups/openclaw]:
 ```
 
 Puedes presionar ENTER para usar los valores por defecto. Si lo ejecutas en un entorno no interactivo, el instalador usará automáticamente los valores por defecto.
+
+Si la carpeta fuente no existe al momento de instalar, el instalador mostrará una advertencia y continuará. El backup fallará hasta que esa carpeta exista.
 
 ## Instalación desde el repo clonado
 
@@ -98,6 +101,7 @@ Ya no es necesario que `backup-openclaw.sh` esté presente junto al instalador, 
 
 | Configuración | Valor |
 | --- | --- |
+| Carpeta fuente | `/root/.openclaw` |
 | Script instalado | `/usr/local/bin/backup-openclaw.sh` |
 | Carpeta de backups | `/var/backups/openclaw` |
 | Carpeta de logs | `/var/log/openclaw-backups` |
@@ -169,7 +173,7 @@ Los logs y archivos `.zip` quedan como `root:<grupo-admin>` con permisos `640`, 
 
 Los directorios de backups quedan sin permisos para otros usuarios y con lectura/listado para el grupo administrador.
 
-## Cambiar la carpeta de backup
+## Cambiar la carpeta de backup o fuente
 
 La forma recomendada es volver a ejecutar el instalador:
 
@@ -177,25 +181,25 @@ La forma recomendada es volver a ejecutar el instalador:
 curl -fsSL https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh | sudo bash
 ```
 
-Cuando pregunte por el destino de backups, indica la nueva ruta.
+Cuando pregunte por la carpeta fuente o destino de backups, indica las nuevas rutas.
 
-El instalador modifica la copia instalada del script y deja configurado cron con esa ruta.
+El instalador modifica la copia instalada del script y deja configurado cron con esos valores.
 
-## Cambiar la carpeta fuente
+## Cambiar manualmente la carpeta fuente
 
-Por defecto se respalda:
+La carpeta fuente queda configurada en el script instalado:
 
 ```bash
 SOURCE_DIR="/root/.openclaw"
 ```
 
-Si OpenClaw usa otra ubicación, edita el script instalado:
+Si OpenClaw usa otra ubicación, también puedes editar el script instalado:
 
 ```bash
 sudo nano /usr/local/bin/backup-openclaw.sh
 ```
 
-Y cambia `SOURCE_DIR` al path correcto.
+Y cambiar `SOURCE_DIR` al path correcto.
 
 ## Cambiar la hora del backup
 
@@ -264,13 +268,19 @@ sudo bash /tmp/install-openclaw-backup.sh
 
 ### El backup falla porque no existe la fuente
 
-Verifica que exista:
+Verifica la carpeta configurada en el script instalado:
+
+```bash
+grep '^SOURCE_DIR=' /usr/local/bin/backup-openclaw.sh
+```
+
+Luego confirma que exista:
 
 ```bash
 sudo ls -la /root/.openclaw
 ```
 
-Si OpenClaw usa otra ubicación, actualiza `SOURCE_DIR` en el script instalado.
+Si OpenClaw usa otra ubicación, vuelve a ejecutar el instalador o actualiza `SOURCE_DIR` en el script instalado.
 
 ### No se crean backups automáticamente
 
