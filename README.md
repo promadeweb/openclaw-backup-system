@@ -38,6 +38,7 @@ El script instalado `backup-openclaw.sh` realiza las siguientes tareas:
 - Linux.
 - Bash.
 - Permisos de root para instalar.
+- `curl` si vas a instalar desde URL.
 - `zip` instalado. El instalador intenta instalarlo automáticamente si el sistema usa `apt-get`.
 - La carpeta fuente debe existir:
 
@@ -47,21 +48,30 @@ El script instalado `backup-openclaw.sh` realiza las siguientes tareas:
 
 ## Instalación sin clonar el repo
 
-Puedes descargar y ejecutar solo `install.sh`.
+La instalación debe ejecutarse con `sudo`, porque el instalador escribe en rutas del sistema como `/usr/local/bin`, `/etc/cron.d`, `/etc/logrotate.d`, `/var/backups` y `/var/log`.
 
-### Opción 1: descargar el instalador y ejecutarlo
-
-```bash
-curl -fsSL -o install-openclaw-backup.sh https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh
-chmod +x install-openclaw-backup.sh
-sudo ./install-openclaw-backup.sh
-```
-
-### Opción 2: ejecutarlo directamente desde la URL
+### Opción recomendada: instalar directo con sudo
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh | sudo bash
 ```
+
+### Opción alternativa: descargar en `/tmp` y ejecutar con sudo
+
+```bash
+curl -fsSL -o /tmp/install-openclaw-backup.sh https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh
+sudo bash /tmp/install-openclaw-backup.sh
+```
+
+### Opción alternativa: guardar el instalador en una ruta del sistema
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh | sudo tee /usr/local/sbin/install-openclaw-backup.sh >/dev/null
+sudo chmod 750 /usr/local/sbin/install-openclaw-backup.sh
+sudo /usr/local/sbin/install-openclaw-backup.sh
+```
+
+> No descargues el instalador con `curl -o install-openclaw-backup.sh` desde una carpeta donde tu usuario normal no tenga permisos de escritura. En ese caso `curl` fallará antes de que `sudo` pueda ejecutar el instalador.
 
 > Nota: si el repositorio es privado, la URL raw pública no funcionará sin autenticación. En ese caso descarga `install.sh` desde GitHub o copia el archivo manualmente al servidor y ejecútalo con `sudo bash install.sh`.
 
@@ -79,8 +89,7 @@ Puedes presionar ENTER para usar los valores por defecto. Si lo ejecutas en un e
 También puedes instalar desde una copia local del repositorio:
 
 ```bash
-chmod +x install.sh
-sudo ./install.sh
+sudo bash install.sh
 ```
 
 Ya no es necesario que `backup-openclaw.sh` esté presente junto al instalador, porque `install.sh` es autocontenido.
@@ -165,7 +174,7 @@ Los directorios de backups quedan sin permisos para otros usuarios y con lectura
 La forma recomendada es volver a ejecutar el instalador:
 
 ```bash
-sudo ./install-openclaw-backup.sh
+curl -fsSL https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh | sudo bash
 ```
 
 Cuando pregunte por el destino de backups, indica la nueva ruta.
@@ -227,7 +236,7 @@ Esto rota los logs diariamente, conserva 14 rotaciones comprimidas y mantiene lo
 El instalador es idempotente. Puedes ejecutarlo varias veces:
 
 ```bash
-sudo ./install-openclaw-backup.sh
+curl -fsSL https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh | sudo bash
 ```
 
 Al reinstalar, se sobrescriben:
@@ -237,6 +246,21 @@ Al reinstalar, se sobrescriben:
 - `/etc/logrotate.d/openclaw-backup`.
 
 ## Solución de problemas
+
+### `curl: (23) Failure writing output to destination`
+
+Ese error ocurre cuando `curl` no puede escribir el archivo en la carpeta actual. Usa instalación directa con sudo:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh | sudo bash
+```
+
+O descarga en `/tmp`:
+
+```bash
+curl -fsSL -o /tmp/install-openclaw-backup.sh https://raw.githubusercontent.com/promadeweb/openclaw-backup-system/main/install.sh
+sudo bash /tmp/install-openclaw-backup.sh
+```
 
 ### El backup falla porque no existe la fuente
 
